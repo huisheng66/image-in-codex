@@ -1,0 +1,7 @@
+work/
+*.tmp
+*.log
+*.err
+__pycache__/
+.env
+.gohok.env
