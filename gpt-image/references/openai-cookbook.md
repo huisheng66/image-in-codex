@@ -1,4 +1,4 @@
-﻿---
+---
 source: https://github.com/openai/openai-cookbook/blob/main/examples/multimodal/image-gen-models-prompting-guide.ipynb
 captured: 2026-04-23
 license: MIT (OpenAI cookbook)
