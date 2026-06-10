@@ -14,12 +14,17 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Iterable
 
-ENDPOINT = "https://img.gohok.top/v1/responses"
+DEFAULT_ENDPOINT = ""
+ENDPOINT_ENV_NAMES = (
+    "GPT_IMAGE_ENDPOINT",
+    "GPT_IMAGE_RESPONSES_ENDPOINT",
+    "IMAGE_RESPONSES_ENDPOINT",
+)
 KEY_ENV_NAMES = (
     "GPT_IMAGE_SKILL_API_KEY",
-    "GOHOK_IMAGE_API_KEY",
-    "AISWING_IMAGE_API_KEY",
-    "IMG_GOHOK_API_KEY",
+    "GPT_IMAGE_API_KEY",
+    "IMAGE_API_KEY",
+    "RESPONSES_API_KEY",
 )
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -43,7 +48,7 @@ def skill_dir() -> Path:
 
 def default_key_files() -> list[Path]:
     root = skill_dir()
-    return [root / ".gohok.env", root / ".env"]
+    return [root / ".env"]
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
@@ -76,6 +81,21 @@ def resolve_api_key(key_files: Iterable[Path] | None = None) -> str | None:
             if value:
                 return value
     return None
+
+
+def resolve_endpoint(config_files: Iterable[Path] | None = None) -> str:
+    for name in ENDPOINT_ENV_NAMES:
+        value = os.environ.get(name)
+        if value:
+            return value
+
+    for config_file in default_key_files() if config_files is None else config_files:
+        values = parse_env_file(Path(config_file))
+        for name in ENDPOINT_ENV_NAMES:
+            value = values.get(name)
+            if value:
+                return value
+    return DEFAULT_ENDPOINT
 
 
 def normalize_size(value: str) -> str:
@@ -178,7 +198,7 @@ def request_image(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
-            "User-Agent": os.environ.get("GOHOK_IMAGE_HTTP_USER_AGENT", DEFAULT_USER_AGENT),
+            "User-Agent": os.environ.get("GPT_IMAGE_HTTP_USER_AGENT", DEFAULT_USER_AGENT),
         },
     )
 
@@ -229,12 +249,12 @@ def write_image(image_b64: str, path: Path) -> Path:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate images through img.gohok.top streaming Responses API.")
+    parser = argparse.ArgumentParser(description="Generate images through a configurable streaming Responses API.")
     parser.add_argument("-p", "--prompt", required=True, help="Prompt or edit instruction.")
     parser.add_argument("-f", "--file", help="Output image path. Auto-named when omitted.")
     parser.add_argument("-i", "--image", action="append", help="Reference image path, data URL, or public URL.")
-    parser.add_argument("-m", "--mask", help="Not supported by the streaming img.gohok.top API.")
-    parser.add_argument("--model", default="gpt-image-2")
+    parser.add_argument("-m", "--mask", help="Not supported by the default streaming Responses client.")
+    parser.add_argument("--model", default=os.environ.get("GPT_IMAGE_MODEL", "gpt-image-2"))
     parser.add_argument("--size", default="1024x1024")
     parser.add_argument("--quality", default="high", choices=["auto", "low", "medium", "high"])
     parser.add_argument("-n", "--n", type=int, default=1)
@@ -243,8 +263,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--background", help="Accepted for CLI compatibility; not sent to this API.")
     parser.add_argument("--moderation", help="Accepted for CLI compatibility; not sent to this API.")
     parser.add_argument("--user", help="Accepted for CLI compatibility; not sent to this API.")
-    parser.add_argument("--endpoint", default=ENDPOINT)
-    parser.add_argument("--provider", default="gohok", choices=["gohok", "openai-cli"])
+    parser.add_argument("--endpoint", default=None, help="Streaming Responses endpoint; overrides GPT_IMAGE_ENDPOINT.")
+    parser.add_argument("--provider", default="streaming-responses", choices=["streaming-responses", "openai-cli"])
     parser.add_argument("--dry-run", action="store_true", help="Print the request body without calling the API.")
     parser.add_argument(
         "--accept-partial-after",
@@ -258,7 +278,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.mask:
-        print("error: --mask/inpainting is not supported by the img.gohok.top streaming API", file=sys.stderr)
+        print("error: --mask/inpainting is not supported by the default streaming Responses client", file=sys.stderr)
         return 2
     if args.n < 1:
         print("error: --n must be at least 1", file=sys.stderr)
@@ -271,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.dry_run:
-        print(json.dumps({"endpoint": args.endpoint, "payload": payload}, ensure_ascii=False, indent=2))
+        print(json.dumps({"endpoint": args.endpoint or resolve_endpoint(), "payload": payload}, ensure_ascii=False, indent=2))
         return 0
 
     api_key = resolve_api_key()
@@ -279,7 +299,16 @@ def main(argv: list[str] | None = None) -> int:
         names = ", ".join(KEY_ENV_NAMES)
         print(
             f"error: missing skill image API key. Set one of {names}, or create "
-            f"{skill_dir() / '.gohok.env'} with GOHOK_IMAGE_API_KEY=...",
+            f"{skill_dir() / '.env'} with GPT_IMAGE_API_KEY=...",
+            file=sys.stderr,
+        )
+        return 2
+    endpoint = args.endpoint or resolve_endpoint()
+    if not endpoint:
+        names = ", ".join(ENDPOINT_ENV_NAMES)
+        print(
+            f"error: missing streaming Responses endpoint. Set one of {names}, create "
+            f"{skill_dir() / '.env'} with GPT_IMAGE_ENDPOINT=..., or pass --endpoint.",
             file=sys.stderr,
         )
         return 2
@@ -290,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
             image_b64 = request_image(
                 payload,
                 api_key,
-                args.endpoint,
+                endpoint,
                 accept_partial=True,
                 accept_partial_after=args.accept_partial_after,
             )

@@ -12,9 +12,9 @@ SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 
-class GohokGenerateTests(unittest.TestCase):
+class StreamingResponsesGenerateTests(unittest.TestCase):
     def test_request_image_returns_partial_image_when_requested(self):
-        from gohok_generate import request_image
+        from streaming_responses_generate import request_image
 
         class FakeResponse(io.BytesIO):
             status = 200
@@ -36,7 +36,7 @@ class GohokGenerateTests(unittest.TestCase):
         with patch("urllib.request.urlopen", return_value=FakeResponse(stream)):
             self.assertEqual(request_image({}, "local-key", "https://example.invalid", accept_partial=True), "cGFydGlhbA==")
 
-    def test_launcher_defaults_to_gohok_provider(self):
+    def test_launcher_defaults_to_streaming_responses_provider(self):
         import generate
 
         with patch.object(sys, "argv", ["generate.py", "-p", "test prompt", "--dry-run"]):
@@ -50,11 +50,11 @@ class GohokGenerateTests(unittest.TestCase):
                 self.assertEqual(generate.main(), 0)
 
     def test_resolves_private_skill_key_and_ignores_openai_key(self):
-        from gohok_generate import resolve_api_key
+        from streaming_responses_generate import resolve_api_key
 
         with tempfile.TemporaryDirectory() as tmp:
-            key_file = Path(tmp) / ".gohok.env"
-            key_file.write_text("GOHOK_IMAGE_API_KEY=local-skill-key\n", encoding="utf-8")
+            key_file = Path(tmp) / ".env"
+            key_file.write_text("GPT_IMAGE_API_KEY=local-skill-key\n", encoding="utf-8")
 
             with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-global-key"}, clear=True):
                 self.assertEqual(resolve_api_key([key_file]), "local-skill-key")
@@ -72,8 +72,18 @@ class GohokGenerateTests(unittest.TestCase):
             with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-global-key"}, clear=True):
                 self.assertIsNone(resolve_api_key([]))
 
+    def test_resolves_endpoint_from_env_file(self):
+        from streaming_responses_generate import resolve_endpoint
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config_file = Path(tmp) / ".env"
+            config_file.write_text("GPT_IMAGE_ENDPOINT=https://provider.example/v1/responses\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(resolve_endpoint([config_file]), "https://provider.example/v1/responses")
+
     def test_converts_local_image_to_data_url(self):
-        from gohok_generate import image_reference_to_data_url
+        from streaming_responses_generate import image_reference_to_data_url
 
         png_header = base64.b64decode("iVBORw0KGgo=")
         with tempfile.TemporaryDirectory() as tmp:
@@ -86,7 +96,7 @@ class GohokGenerateTests(unittest.TestCase):
         self.assertIn("iVBORw0KGgo=", data_url)
 
     def test_extracts_final_image_b64_from_response_completed_event(self):
-        from gohok_generate import extract_image_b64
+        from streaming_responses_generate import extract_image_b64
 
         event = {
             "type": "response.completed",
@@ -101,7 +111,7 @@ class GohokGenerateTests(unittest.TestCase):
         self.assertEqual(extract_image_b64(event), "ZmFrZS1pbWFnZQ==")
 
     def test_normalizes_documented_size_aliases(self):
-        from gohok_generate import normalize_size
+        from streaming_responses_generate import normalize_size
 
         self.assertEqual(normalize_size("landscape"), "3840x2160")
         self.assertEqual(normalize_size("portrait"), "2160x3840")

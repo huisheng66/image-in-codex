@@ -9,7 +9,7 @@
 """Skill launcher for the gpt-image skill.
 
 Resolution order:
-1. Default: run this skill's bundled img.gohok.top streaming API client.
+1. Default: run this skill's bundled streaming Responses API client.
 2. With --provider openai-cli: delegate to the legacy shared gpt-image CLI.
 
 This keeps `skills/gpt-image` usable when copied as a standalone skill folder
@@ -27,7 +27,7 @@ _REPO_URL = "git+https://github.com/wuyoscar/gpt_image_2_skill"
 
 def _take_provider_arg() -> str:
     """Remove this launcher's provider flag before forwarding other args."""
-    provider = "gohok"
+    provider = "streaming-responses"
     for index, arg in enumerate(list(sys.argv[1:]), start=1):
         if arg == "--provider" and index + 1 < len(sys.argv):
             provider = sys.argv[index + 1]
@@ -40,12 +40,12 @@ def _take_provider_arg() -> str:
     return provider
 
 
-def _run_gohok_client() -> int:
+def _run_streaming_responses_client() -> int:
     script_path = Path(__file__).resolve()
     sys.path.insert(0, str(script_path.parent))
-    from gohok_generate import main as gohok_main  # type: ignore
+    from streaming_responses_generate import main as streaming_main  # type: ignore
 
-    return int(gohok_main(sys.argv[1:]) or 0)
+    return int(streaming_main(sys.argv[1:]) or 0)
 
 
 def _import_local_or_installed_main():
@@ -74,10 +74,10 @@ def _delegate(command: list[str]) -> int:
 
 def main() -> int:
     provider = _take_provider_arg()
-    if provider == "gohok":
-        return _run_gohok_client()
+    if provider == "streaming-responses":
+        return _run_streaming_responses_client()
     if provider != "openai-cli":
-        print("error: --provider must be either 'gohok' or 'openai-cli'", file=sys.stderr)
+        print("error: --provider must be either 'streaming-responses' or 'openai-cli'", file=sys.stderr)
         return 2
 
     cli_main = _import_local_or_installed_main()

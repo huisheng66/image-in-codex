@@ -1,4 +1,4 @@
 interface:
   display_name: "GPT Image"
-  short_description: "Generate/edit GPT Image 2 visuals through the local streaming API client"
-  default_prompt: "Use $gpt-image to analyze my image request. For real products, brands, people, places, or current subjects, first search or inspect sources with Codex, summarize the factual visual details, write a source-grounded prompt, then search the Reference Gallery/craft files and call the bundled img.gohok.top streaming API client with the skill-private API key. Use --provider openai-cli only when I explicitly ask for the legacy OpenAI CLI path."
+  short_description: "Generate/edit GPT Image visuals through a configurable streaming API client"
+  default_prompt: "Use $gpt-image to analyze my image request. For real products, brands, people, places, or current subjects, first search or inspect sources with Codex, summarize the factual visual details, write a source-grounded prompt, then search the Reference Gallery/craft files and call the bundled configurable streaming Responses API client. Use the endpoint, API key, and model configured by the user; do not assume a local path or a specific provider. Use --provider openai-cli only when I explicitly ask for that legacy CLI path."
