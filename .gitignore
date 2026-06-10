@@ -3,5 +3,6 @@ work/
 *.log
 *.err
 __pycache__/
+*.pyc
 .env
 .gohok.env
